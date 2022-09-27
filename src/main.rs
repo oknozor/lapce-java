@@ -1,12 +1,17 @@
+use std::path::PathBuf;
+
 use anyhow::Result;
+
 use lapce_plugin::{
     psp_types::{
         lsp_types::{request::Initialize, DocumentFilter, DocumentSelector, InitializeParams, Url},
         Request,
     },
-    register_plugin, LapcePlugin, VoltEnvironment, PLUGIN_RPC,
+    register_plugin, Http, LapcePlugin, VoltEnvironment, PLUGIN_RPC,
 };
 use serde_json::Value;
+
+mod archive;
 
 #[derive(Default)]
 struct State {}
@@ -16,20 +21,13 @@ register_plugin!(State);
 fn initialize(params: InitializeParams) -> Result<()> {
     let document_selector: DocumentSelector = vec![DocumentFilter {
         // lsp language id
-        language: Some(String::from("language_id")),
+        language: Some(String::from("java")),
         // glob pattern
-        pattern: Some(String::from("**/*.{ext1,ext2}")),
+        pattern: Some(String::from("**/*.java")),
         // like file:
         scheme: None,
     }];
     let mut server_args = vec![];
-
-    // Check for user specified LSP server path
-    // ```
-    // [lapce-plugin-name.lsp]
-    // serverPath = "[path or filename]"
-    // serverArgs = ["--arg1", "--arg2"]
-    // ```
     if let Some(options) = params.initialization_options.as_ref() {
         if let Some(lsp) = options.get("lsp") {
             if let Some(args) = lsp.get("serverArgs") {
@@ -62,44 +60,30 @@ fn initialize(params: InitializeParams) -> Result<()> {
         }
     }
 
-    // Architecture check
-    let _ = match VoltEnvironment::architecture().as_deref() {
-        Ok("x86_64") => "x86_64",
-        Ok("aarch64") => "aarch64",
-        _ => return Ok(()),
-    };
+    let file_name = "jdt-language-server-latest";
+    let gz_path = PathBuf::from(format!("{file_name}.tar.gz"));
+    let url = format!(
+        "http://download.eclipse.org/jdtls/snapshots/{}.tar.gz",
+        file_name
+    );
 
-    // OS check
-    let _ = match VoltEnvironment::operating_system().as_deref() {
-        Ok("macos") => "macos",
-        Ok("linux") => "linux",
-        Ok("windows") => "windows",
-        _ => return Ok(()),
-    };
-
-    // Download URL
-    // let _ = format!("https://github.com/<name>/<project>/releases/download/<version>/{filename}");
-
-    // see lapce_plugin::Http for available API to download files
-
-    let _ = match VoltEnvironment::operating_system().as_deref() {
-        Ok("windows") => {
-            format!("{}.exe", "[filename]")
+    if !PathBuf::from(file_name).exists() {
+        let mut resp = Http::get(&url)?;
+        let body = resp.body_read_all()?;
+        std::fs::write(&gz_path, body)?;
+        let result = archive::unpack(gz_path, PathBuf::from(file_name));
+        if let Err(err) = result {
+            PLUGIN_RPC.stderr(&format!("Error unpacking archive: {err}"));
         }
-        _ => "[filename]".to_string(),
-    };
+    }
 
     // Plugin working directory
     let volt_uri = VoltEnvironment::uri()?;
-    let server_path = Url::parse(&volt_uri)?.join("[filename]")?;
+    let base_path = Url::parse(&volt_uri)?;
+    let jdtls = base_path.join(&format!("{file_name}/bin/jdtls"))?;
 
-    // if you want to use server from PATH
-    // let server_path = Url::parse(&format!("urn:{filename}"))?;
-
-    // Available language IDs
-    // https://github.com/lapce/lapce/blob/HEAD/lapce-proxy/src/buffer.rs#L173
     PLUGIN_RPC.start_lsp(
-        server_path,
+        jdtls,
         server_args,
         document_selector,
         params.initialization_options,
@@ -110,6 +94,7 @@ fn initialize(params: InitializeParams) -> Result<()> {
 
 impl LapcePlugin for State {
     fn handle_request(&mut self, _id: u64, method: String, params: Value) {
+        PLUGIN_RPC.stderr(&format!("{_id}, {method}"));
         #[allow(clippy::single_match)]
         match method.as_str() {
             Initialize::METHOD => {

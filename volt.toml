@@ -1,6 +1,10 @@
-name = "<plugin-name>"
-version = "0.0.0"
-author = "<your name>"
-display-name = "<plugin-display-name>"
-description = "<plugin-description>"
-wasm = "bin/<plugin-name>.wasm"
+name = "lapce-java"
+version = "0.1.0"
+author = "Paul Delafosse <paul.delfafosse@gmail.com>"
+display-name = "Java"
+description = "Lapce LSP plugin for java, powered by Eclipse JDT Language Server"
+wasm = "bin/lapce-java.wasm"
+
+[activation]
+language = ["java"]
+workspace-contains = ["*/*.java"]
