@@ -1,0 +1,6 @@
+name = "<plugin-name>"
+version = "0.0.0"
+author = "<your name>"
+display-name = "<plugin-display-name>"
+description = "<plugin-description>"
+wasm = "bin/<plugin-name>.wasm"
