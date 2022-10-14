@@ -8,3 +8,7 @@ wasm = "bin/lapce-java.wasm"
 [activation]
 language = ["java"]
 workspace-contains = ["*/*.java"]
+
+[config."lombok"]
+default = false
+description = "Enable the lombok java agent"
