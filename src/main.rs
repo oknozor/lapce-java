@@ -23,17 +23,17 @@ fn initialize(params: InitializeParams) -> Result<()> {
         pattern: Some(String::from("**/*.java")),
         scheme: None,
     }];
-    let mut server_args = vec![];
 
-    // Check for user specified LSP server path
-    // ```
-    // [lapce-plugin-name.lsp]
-    // serverPath = "[path or filename]"
-    // serverArgs = ["--arg1", "--arg2"]
-    // ```
+    let mut server_args = vec![];
+    let mut enable_lombok_agent = false;
+
     if let Some(options) = params.initialization_options.as_ref() {
-        if let Some(lsp) = options.get("lsp") {
-            if let Some(args) = lsp.get("serverArgs") {
+        if let Some(enable_lombok) = options.get("lombok") {
+            enable_lombok_agent = serde_json::from_value(enable_lombok.clone())?;
+        }
+
+        if let Some(volt) = options.get("volt") {
+            if let Some(args) = volt.get("serverArgs") {
                 if let Some(args) = args.as_array() {
                     if !args.is_empty() {
                         server_args = vec![];
@@ -46,12 +46,12 @@ fn initialize(params: InitializeParams) -> Result<()> {
                 }
             }
 
-            if let Some(server_path) = lsp.get("serverPath") {
+            if let Some(server_path) = volt.get("serverPath") {
                 if let Some(server_path) = server_path.as_str() {
                     if !server_path.is_empty() {
-                        let server_uri = Url::parse(&format!("urn:{}", server_path))?;
+                        let url = Url::parse(&format!("urn:{}", server_path))?;
                         PLUGIN_RPC.start_lsp(
-                            server_uri,
+                            url,
                             server_args,
                             document_selector,
                             params.initialization_options,
