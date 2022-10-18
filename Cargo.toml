@@ -1,17 +1,19 @@
 [package]
 edition = "2021"
-name = "lapce-plugin-template"
-version = "0.0.0"
+name = "lapce-java"
+version = "0.2.0"
 resolver = "2"
 
 [target.'cfg(target_os = "wasi")'.dependencies]
 
-# default deps for all lapce plugins
 anyhow = "1.0"
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-# lapce-plugin = { git = "https://github.com/lapce/lapce-plugin-rust.git", branch = "volt" }
 lapce-plugin = { git = "https://github.com/panekj/lapce-plugin-rust.git", branch = "volt" }
+# replace with upstream when https://github.com/alexcrichton/tar-rs/pull/303 gets merged
+tar = { git = "https://github.com/oknozor/tar-rs/", branch = "ignore-perm-on-wasm" }
+flate2 = "1.0"
+
 
 [profile.release]
 opt-level = 3
