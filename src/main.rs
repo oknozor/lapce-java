@@ -1,10 +1,14 @@
 use anyhow::Result;
+use flate2::read::MultiGzDecoder;
+use std::fs::File;
+use std::path::PathBuf;
+
 use lapce_plugin::{
     psp_types::{
         lsp_types::{request::Initialize, DocumentFilter, DocumentSelector, InitializeParams, Url},
         Request,
     },
-    register_plugin, LapcePlugin, VoltEnvironment, PLUGIN_RPC,
+    register_plugin, Http, LapcePlugin, VoltEnvironment, PLUGIN_RPC,
 };
 use serde_json::Value;
 
@@ -59,44 +63,66 @@ fn initialize(params: InitializeParams) -> Result<()> {
         }
     }
 
-    // Architecture check
-    let _ = match VoltEnvironment::architecture().as_deref() {
-        Ok("x86_64") => "x86_64",
-        Ok("aarch64") => "aarch64",
-        _ => return Ok(()),
-    };
+    let jdtls_file_name = "jdt-language-server-latest";
+    let gz_path = PathBuf::from(format!("{jdtls_file_name}.tar.gz"));
+    let url = format!(
+        "http://download.eclipse.org/jdtls/snapshots/{}.tar.gz",
+        jdtls_file_name
+    );
 
-    // OS check
-    let _ = match VoltEnvironment::operating_system().as_deref() {
-        Ok("macos") => "macos",
-        Ok("linux") => "linux",
-        Ok("windows") => "windows",
-        _ => return Ok(()),
-    };
-
-    // Download URL
-    // let _ = format!("https://github.com/<name>/<project>/releases/download/<version>/{filename}");
-
-    // see lapce_plugin::Http for available API to download files
-
-    let _ = match VoltEnvironment::operating_system().as_deref() {
-        Ok("windows") => {
-            format!("{}.exe", "[filename]")
+    if !PathBuf::from(jdtls_file_name).exists() {
+        if !gz_path.exists() {
+            let mut resp = Http::get(&url)?;
+            let body = resp.body_read_all()?;
+            std::fs::write(&gz_path, body)?;
         }
-        _ => "[filename]".to_string(),
-    };
+
+        let tar_gz = std::fs::File::open(gz_path).unwrap();
+        let tar = MultiGzDecoder::new(tar_gz);
+        let mut archive = tar::Archive::new(tar);
+        let dir = PathBuf::from(jdtls_file_name);
+        std::fs::create_dir(&dir)?;
+        for (_, file) in archive.entries().unwrap().raw(true).enumerate() {
+            let mut entry = file?;
+            let entry_type = entry.header().entry_type();
+            if !entry_type.is_dir() && !entry_type.is_file() {
+                continue;
+            }
+
+            let entry_path = dir.join(&entry.path()?);
+            if entry_type.is_dir() {
+                std::fs::create_dir_all(&entry_path)?;
+            } else if entry_type.is_file() {
+                let mut outfile = File::create(&entry_path)?;
+                std::io::copy(&mut entry, &mut outfile)?;
+            }
+        }
+    }
 
     // Plugin working directory
     let volt_uri = VoltEnvironment::uri()?;
-    let server_path = Url::parse(&volt_uri)?.join("[filename]")?;
+    let base_path = Url::parse(&volt_uri)?;
 
-    // if you want to use server from PATH
-    // let server_path = Url::parse(&format!("urn:{filename}"))?;
+    if enable_lombok_agent {
+        let lombok_jar = "lombok.jar";
+        let lombok_url = format!("https://projectlombok.org/downloads/{lombok_jar}");
 
-    // Available language IDs
-    // https://github.com/lapce/lapce/blob/HEAD/lapce-proxy/src/buffer.rs#L173
+        if !PathBuf::from(lombok_jar).exists() {
+            let mut resp = Http::get(&lombok_url)?;
+            let body = resp.body_read_all()?;
+            std::fs::write(&lombok_jar, body)?;
+        }
+
+        let lombok = base_path.join("lombok.jar")?;
+        let lombok = lombok.to_file_path().expect("failed to get file path");
+        let lombok = lombok.to_string_lossy();
+        server_args.push(format!("--jvm-arg=-javaagent:{lombok}"));
+    }
+
+    let jdtls = base_path.join(&format!("{jdtls_file_name}/bin/jdtls"))?;
+
     PLUGIN_RPC.start_lsp(
-        server_path,
+        jdtls,
         server_args,
         document_selector,
         params.initialization_options,
@@ -107,6 +133,7 @@ fn initialize(params: InitializeParams) -> Result<()> {
 
 impl LapcePlugin for State {
     fn handle_request(&mut self, _id: u64, method: String, params: Value) {
+        PLUGIN_RPC.stderr(&format!("{_id}, {method}"));
         #[allow(clippy::single_match)]
         match method.as_str() {
             Initialize::METHOD => {
