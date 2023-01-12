@@ -43,7 +43,6 @@ Add following configuration to `${WORKSPACE_DIR}/.lapce/settings.toml`:
 
 [lapce-java]
 lombok = false
-description = "Language Server's Arguments"
 
 [lapce-java.volt]
 serverPath = "/usr/local/bin/jdtls"             # Example: Eclipse JDT Language Server
