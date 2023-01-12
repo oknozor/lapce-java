@@ -66,7 +66,7 @@ fn initialize(params: InitializeParams) -> Result<()> {
     let jdtls_file_name = "jdt-language-server-latest";
     let gz_path = PathBuf::from(format!("{jdtls_file_name}.tar.gz"));
     let url = format!(
-        "http://download.eclipse.org/jdtls/snapshots/{}.tar.gz",
+        "https://download.eclipse.org/jdtls/snapshots/{}.tar.gz",
         jdtls_file_name
     );
 
