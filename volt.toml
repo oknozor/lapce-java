@@ -14,3 +14,11 @@ workspace-contains = ["*/*.java"]
 [config."lombok"]
 default = false
 description = "Enable the lombok java agent"
+
+[config."volt.serverArgs"]
+default = ""
+description = "Language Server's Arguments"
+
+[config."volt.serverPath"]
+default = ""
+description = "Path of `Java Language Server` executable. When empty, it points to the bundled binary `jdtls`."
