@@ -17,7 +17,14 @@ To install from source use the provided [just](https://github.com/casey/just) re
 ❯ just install-debug
 ```
  
+## Initializing Projects
 
+If you are using Maven for your Java Project, you have to initialize your project for Eclipse JDT using:
+```shell
+❯ mvn eclipse:eclipse 
+```
+
+Without initializing your project, Eclipse JDT won't work.
  
 ## Licence
 
